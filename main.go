@@ -70,8 +70,21 @@ const WHALEURL = "https://api.whale-alert.io/v1/transactions"
 
 func main() {
 	configPath := flag.String("c", "config.json", "config file")
-	start := flag.Int64("start", time.Now().Truncate(10*time.Minute).Add(time.Minute*-50).Unix(), "start time in unix seconds for fetching transactions")
-	end := flag.Int64("end", *start+60*50-1, "end time in unix seconds for fetching transactions")
+	interval := flag.Int64("interval", 48, "minutes between start and end if not provided")
+	/*
+		48 so cron is more convenient
+		can't be 60 because whale alert complains about time range
+		0,48 0,4,8,12,16,20 * * *
+		36 1,5,9,13,17,21 * * *
+		24 2,6,10,14,18,22 * * *
+		12 3,7,11,15,19,23 * * *
+	*/
+	// rounded down to nearest minute
+	start := flag.Int64("start", time.Now().Truncate(time.Minute).Unix()-*interval*60, "start time in unix seconds for fetching transactions")
+	// 48 minutes after start
+	// minus one second because whale alert end is inclusive
+	end := flag.Int64("end", *start+*interval*60-1, "end time in unix seconds for fetching transactions")
+
 	flag.Parse()
 	config := parseConfig(*configPath)
 

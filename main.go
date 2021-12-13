@@ -92,11 +92,11 @@ func main() {
 	if err != nil {
 		sendMessage(config.Telegram.BotID, config.Telegram.LogID, err.Error())
 	}
-	sendMessage(config.Telegram.BotID, config.Telegram.LogID, fmt.Sprintf("%d whale transactions from %s to %s\n%s",
+	sendMessage(config.Telegram.BotID, config.Telegram.LogID, fmt.Sprintf("[%d whale transactions](%s) from %s to %s",
 		len(transactions),
-		time.Unix(*start, 0).Format("Jan 2 3:04PM"),
-		time.Unix(*end, 0).Format("3:04PM"),
 		url,
+		time.Unix(*start, 0).Format("Jan 2 3:04:05PM"),
+		time.Unix(*end, 0).Format("3:04:05PM"),
 	))
 	if len(transactions) < 1 {
 		return

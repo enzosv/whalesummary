@@ -155,7 +155,7 @@ func fetchTransactions(config WhaleAlertConfig, existing []Transaction, cursor s
 	}
 	existing = append(existing, response.Transactions...)
 
-	if response.Count > config.Limit {
+	if response.Count >= config.Limit {
 		return fetchTransactions(config, existing, response.Cursor, start, end, true)
 	}
 	return request_url, existing, nil

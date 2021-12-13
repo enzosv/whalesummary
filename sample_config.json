@@ -1,0 +1,31 @@
+{
+    "telegram":{
+        "bot_id":"get from https://t.me/botfather",
+        "recipient_id":"make a channel or something",
+        "log_id": "make a separate channel or use your chat id"
+    },
+    "whale_alert":{
+        "api_key":"get from https://whale-alert.io/account",
+        "min": "5000000",
+        "limit": 100
+    },
+    "stable_coins":[
+        "usdt", 
+        "usdc", 
+        "ust", 
+        "tusd",
+        "busd",
+        "dai", 
+        "dgx", 
+        "paxg", 
+        "gusd", 
+        "frax", 
+        "usdp", 
+        "lusd", 
+        "usdn", 
+        "fei", 
+        "husd", 
+        "eurt", 
+        "susd"
+    ]
+}

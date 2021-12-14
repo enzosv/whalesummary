@@ -90,16 +90,17 @@ func main() {
 	flag.Parse()
 	config := parseConfig(*configPath)
 
-	url, transactions, err := fetchTransactions(config.WhaleAlert, []Transaction{}, "", *start, *end, true)
+	_, transactions, err := fetchTransactions(config.WhaleAlert, []Transaction{}, "", *start, *end, true)
 	if err != nil {
 		sendMessage(config.Telegram.BotID, config.Telegram.LogID, err.Error())
+		// not returning to continue with successful requests if any
 	}
-	sendMessage(config.Telegram.BotID, config.Telegram.LogID, fmt.Sprintf("[%d whale transactions](%s) from %s to %s",
-		len(transactions),
-		url,
-		time.Unix(*start, 0).Format("Jan 2 3:04:05PM"),
-		time.Unix(*end, 0).Format("3:04:05PM"),
-	))
+	// sendMessage(config.Telegram.BotID, config.Telegram.LogID, fmt.Sprintf("[%d whale transactions](%s) from %s to %s",
+	// 	len(transactions),
+	// 	url,
+	// 	time.Unix(*start, 0).Format("Jan 2 3:04:05PM"),
+	// 	time.Unix(*end, 0).Format("3:04:05PM"),
+	// ))
 	if len(transactions) < 1 {
 		return
 	}

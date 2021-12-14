@@ -50,10 +50,12 @@ type Wallet struct {
 }
 
 type Config struct {
-	Telegram    TelegramConfig   `json:"telegram"`
-	WhaleAlert  WhaleAlertConfig `json:"whale_alert"`
-	StableCoins []string         `json:"stable_coins"`
+	Telegram    TelegramConfig    `json:"telegram"`
+	WhaleAlert  WhaleAlertConfig  `json:"whale_alert"`
+	StableCoins []string          `json:"stable_coins"`
+	Remap       map[string]string `json:"remap"`
 }
+
 type TelegramConfig struct {
 	BotID       string `json:"bot_id"`
 	RecipientID string `json:"recipient_id"`
@@ -102,7 +104,7 @@ func main() {
 		return
 	}
 
-	supply, transfers, unhandled := summarizeTransactions(transactions)
+	supply, transfers, unhandled := summarizeTransactions(transactions, config.Remap)
 	if len(unhandled) > 0 {
 		sendMessage(config.Telegram.BotID, config.Telegram.LogID, "unhandled:\n"+strings.Join(unhandled, "\n"))
 	}
@@ -174,18 +176,23 @@ func fetchTransactions(config WhaleAlertConfig, existing []Transaction, cursor s
 	return request_url, existing, nil
 }
 
-func summarizeTransactions(transactions []Transaction) (map[string]float64, map[string]float64, []string) {
+func summarizeTransactions(transactions []Transaction, tickermap map[string]string) (map[string]float64, map[string]float64, []string) {
 	transfers := map[string]float64{}
 	supply := map[string]float64{}
 	var unhandled []string
 
 	for _, transaction := range transactions {
+		symbol := transaction.Symbol
+		// remap symbol like pax is actually usdp
+		if value, ok := tickermap[symbol]; ok {
+			symbol = value
+		}
 		if transaction.TransactionType == "mint" {
-			supply[transaction.Symbol] += transaction.AmountUsd
+			supply[symbol] += transaction.AmountUsd
 			continue
 		}
 		if transaction.TransactionType == "burn" {
-			supply[transaction.Symbol] -= transaction.AmountUsd
+			supply[symbol] -= transaction.AmountUsd
 			continue
 		}
 		if transaction.TransactionType != "transfer" {
@@ -197,12 +204,12 @@ func summarizeTransactions(transactions []Transaction) (map[string]float64, map[
 		}
 		if transaction.From.OwnerType == "exchange" && transaction.To.OwnerType != "exchange" {
 			// exchange outflow
-			transfers[transaction.Symbol] -= transaction.AmountUsd
+			transfers[symbol] -= transaction.AmountUsd
 			continue
 		}
 		if transaction.From.OwnerType != "exchange" && transaction.To.OwnerType == "exchange" {
 			// exchange inflow
-			transfers[transaction.Symbol] += transaction.AmountUsd
+			transfers[symbol] += transaction.AmountUsd
 			continue
 		}
 		if transaction.From.OwnerType == "unknown" && transaction.To.OwnerType == "unknown" {
@@ -315,8 +322,10 @@ func analyzeSummary(supply, transfers map[string]float64, stablecoins []string) 
 }
 
 func isStableCoin(symbol string, stablecoins []string) bool {
+	lowercaseSymbol := strings.ToLower(symbol)
 	for _, ticker := range stablecoins {
-		if ticker == symbol {
+		// is this better than strings.EqualFold(ticker, symbol)
+		if strings.ToLower(ticker) == lowercaseSymbol {
 			return true
 		}
 	}

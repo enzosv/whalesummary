@@ -213,35 +213,7 @@ func summarizeTransactions(transactions []Transaction, tickermap map[string]stri
 			transfers[symbol] += transaction.AmountUsd
 			continue
 		}
-		if transaction.From.OwnerType == "unknown" && transaction.To.OwnerType == "unknown" {
-			//ignore p2p
-			continue
-		}
-		if transaction.From.OwnerType == "exchange" && transaction.To.OwnerType == "exchange" {
-			//ignore b2b
-			continue
-		}
-		if transaction.From.Owner == transaction.To.Owner {
-			//ignore internal
-			continue
-		}
-		if transaction.From.OwnerType == "other" && transaction.To.OwnerType == "other" {
-			//ignore p2p
-			continue
-		}
-		if transaction.From.OwnerType == "unknown" && transaction.To.OwnerType == "other" {
-			//ignore p2p
-			continue
-		}
-		if transaction.From.OwnerType == "other" && transaction.To.OwnerType == "unknown" {
-			//ignore p2p
-			continue
-		}
 		// TODO: handle others
-		unhandled = append(unhandled, fmt.Sprintf("  %s:  %s (%s) -> %s (%s)",
-			transaction.TransactionType,
-			transaction.From.OwnerType, transaction.From.Owner,
-			transaction.To.OwnerType, transaction.To.Owner))
 	}
 	return supply, transfers, unhandled
 

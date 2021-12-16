@@ -67,6 +67,18 @@ type WhaleAlertConfig struct {
 	Limit  int    `json:"limit"` //page limit
 }
 
+type TransactionType int
+
+const (
+	MINT TransactionType = iota
+	BURN
+	TRANSFER
+)
+
+func (t TransactionType) String() string {
+	return [...]string{"mint", "burn", "transfer"}[t]
+}
+
 const TGURL = "https://api.telegram.org"
 const WHALEURL = "https://api.whale-alert.io/v1/transactions"
 
@@ -183,36 +195,42 @@ func summarizeTransactions(transactions []Transaction, tickermap map[string]stri
 	var unhandled []string
 
 	for _, transaction := range transactions {
+		// TODO: side effect log addresses
 		symbol := transaction.Symbol
 		// remap symbol like pax is actually usdp
 		if value, ok := tickermap[symbol]; ok {
 			symbol = value
 		}
-		if transaction.TransactionType == "mint" {
+		if transaction.TransactionType == MINT.String() {
 			supply[symbol] += transaction.AmountUsd
 			continue
 		}
-		if transaction.TransactionType == "burn" {
+		if transaction.TransactionType == BURN.String() {
 			supply[symbol] -= transaction.AmountUsd
 			continue
 		}
-		if transaction.TransactionType != "transfer" {
+		if transaction.TransactionType != TRANSFER.String() {
 			unhandled = append(unhandled, fmt.Sprintf("  %s:  %s (%s) -> %s (%s)",
 				transaction.TransactionType,
 				transaction.From.OwnerType, transaction.From.Owner,
 				transaction.To.OwnerType, transaction.To.Owner))
 			continue
 		}
-		if transaction.From.OwnerType == "exchange" && transaction.To.OwnerType != "exchange" {
+		if transaction.From.OwnerType == transaction.To.OwnerType {
+			// ignore internal
+			continue
+		}
+		if transaction.From.OwnerType == "exchange" {
 			// exchange outflow
 			transfers[symbol] -= transaction.AmountUsd
 			continue
 		}
-		if transaction.From.OwnerType != "exchange" && transaction.To.OwnerType == "exchange" {
+		if transaction.To.OwnerType == "exchange" {
 			// exchange inflow
 			transfers[symbol] += transaction.AmountUsd
 			continue
 		}
+		// everything else is ignored
 		// TODO: handle others
 	}
 	return supply, transfers, unhandled

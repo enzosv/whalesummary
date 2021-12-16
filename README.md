@@ -33,7 +33,7 @@ These are not guarantees nor are they financial advice. Just my opinion.
 # Development
 ## Requirements
 1. go
-2. config.json file. See sample_config.json.
+2. config.json file. See [sample_config.json](https://github.com/enzosv/whalesummary/blob/master/sample_config.json).
 
 ## Build and run
 ```

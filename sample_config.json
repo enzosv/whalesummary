@@ -27,5 +27,6 @@
         "husd", 
         "eurt", 
         "susd"
-    ]
+    ],
+    "remap": {"pax": "usdp"}
 }

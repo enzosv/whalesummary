@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -17,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -54,6 +56,7 @@ type Config struct {
 	WhaleAlert  WhaleAlertConfig  `json:"whale_alert"`
 	StableCoins []string          `json:"stable_coins"`
 	Remap       map[string]string `json:"remap"`
+	LogDBURL    string            `json:"log_db_url"`
 }
 
 type TelegramConfig struct {
@@ -116,7 +119,7 @@ func main() {
 	if len(transactions) < 1 {
 		return
 	}
-
+	logWhales(context.Background(), config.LogDBURL, transactions)
 	supply, transfers, unhandled := summarizeTransactions(transactions, config.Remap)
 	if len(unhandled) > 0 {
 		sendMessage(config.Telegram.BotID, config.Telegram.LogID, "unhandled:\n"+strings.Join(unhandled, "\n"))
@@ -358,4 +361,24 @@ func sendMessage(bot, chatID, message string) error {
 	}
 	fmt.Println(string(body))
 	return nil
+}
+
+func logWhales(ctx context.Context, pgurl string, transactions []Transaction) {
+	query := `
+		INSERT INTO whales
+		(blockchain, address, owner, owner_type)
+		VALUES ($1, $2, NULLIF($3, ''), $4)
+		ON CONFLICT ON CONSTRAINT ux_blockchain_address DO UPDATE SET
+			owner = NULLIF($3, ''),
+			owner_type = $4;
+	`
+	conn, err := pgx.Connect(ctx, pgurl)
+	if err != nil {
+		return
+	}
+	defer conn.Close(ctx)
+	for _, transaction := range transactions {
+		conn.Exec(ctx, query, transaction.Blockchain, transaction.From.Address, transaction.From.Owner, transaction.From.OwnerType)
+		conn.Exec(ctx, query, transaction.Blockchain, transaction.To.Address, transaction.To.Owner, transaction.To.OwnerType)
+	}
 }

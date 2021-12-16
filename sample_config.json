@@ -9,6 +9,7 @@
         "min": "5000000",
         "limit": 100
     },
+    "log_db_url":"postgres://user:password@host:5432/database",
     "stable_coins":[
         "usdt", 
         "usdc", 

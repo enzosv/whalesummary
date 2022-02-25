@@ -261,7 +261,11 @@ func analyzeSummary(supply, transfers, locks map[string]float64, stablecoins []s
 			// sum of mint and burn might be insignificant. ignore
 			continue
 		}
-		m := p.Sprintf("  `%-5s`: $%.0f", strings.ToUpper(key), abs)
+		val := p.Sprintf("%.2fM", abs/1000000)
+		if abs >= 1000000000 {
+			val = p.Sprintf("%.2fB", abs/1000000000)
+		}
+		m := p.Sprintf("  `%-5s`: $%s", strings.ToUpper(key), val)
 		if value < 0 {
 			if isStableCoin(key, stablecoins) {
 				// burning of stable coin suggets conversion into fiat. bearish
@@ -300,7 +304,11 @@ func analyzeSummary(supply, transfers, locks map[string]float64, stablecoins []s
 			// sum of inflow and outflow might be insignificant. ignore
 			continue
 		}
-		m := p.Sprintf("  `%-5s`: $%.0f", strings.ToUpper(key), abs)
+		val := p.Sprintf("%.2fM", abs/1000000)
+		if abs >= 1000000000 {
+			val = p.Sprintf("%.2fB", abs/1000000000)
+		}
+		m := p.Sprintf("  `%-5s`: $%s", strings.ToUpper(key), val)
 		if value < 0 {
 			// outflow
 			if isStableCoin(key, stablecoins) {

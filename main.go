@@ -76,10 +76,12 @@ const (
 	MINT TransactionType = iota
 	BURN
 	TRANSFER
+	LOCK
+	UNLOCK
 )
 
 func (t TransactionType) String() string {
-	return [...]string{"mint", "burn", "transfer"}[t]
+	return [...]string{"mint", "burn", "transfer", "lock", "unlock"}[t]
 }
 
 const TGURL = "https://api.telegram.org"
@@ -120,12 +122,12 @@ func main() {
 		return
 	}
 	logWhales(context.Background(), config.LogDBURL, transactions)
-	supply, transfers, unhandled := summarizeTransactions(transactions, config.Remap)
+	supply, transfers, locks, unhandled := summarizeTransactions(transactions, config.Remap)
 	if len(unhandled) > 0 {
 		sendMessage(config.Telegram.BotID, config.Telegram.LogID, "unhandled:\n"+strings.Join(unhandled, "\n"))
 	}
 
-	analysis := analyzeSummary(supply, transfers, config.StableCoins)
+	analysis := analyzeSummary(supply, transfers, locks, config.StableCoins)
 	sendMessage(config.Telegram.BotID, config.Telegram.RecipientID, analysis)
 }
 
@@ -192,9 +194,10 @@ func fetchTransactions(config WhaleAlertConfig, existing []Transaction, cursor s
 	return request_url, existing, nil
 }
 
-func summarizeTransactions(transactions []Transaction, tickermap map[string]string) (map[string]float64, map[string]float64, []string) {
+func summarizeTransactions(transactions []Transaction, tickermap map[string]string) (map[string]float64, map[string]float64, map[string]float64, []string) {
 	transfers := map[string]float64{}
 	supply := map[string]float64{}
+	locks := map[string]float64{}
 	var unhandled []string
 
 	for _, transaction := range transactions {
@@ -211,6 +214,12 @@ func summarizeTransactions(transactions []Transaction, tickermap map[string]stri
 		if transaction.TransactionType == BURN.String() {
 			supply[symbol] -= transaction.AmountUsd
 			continue
+		}
+		if transaction.TransactionType == UNLOCK.String() {
+			locks[symbol] -= transaction.AmountUsd
+		}
+		if transaction.TransactionType == LOCK.String() {
+			locks[symbol] += transaction.AmountUsd
 		}
 		if transaction.TransactionType != TRANSFER.String() {
 			unhandled = append(unhandled, fmt.Sprintf("  %s:  %s (%s) -> %s (%s)",
@@ -236,11 +245,11 @@ func summarizeTransactions(transactions []Transaction, tickermap map[string]stri
 		// everything else is ignored
 		// TODO: handle others
 	}
-	return supply, transfers, unhandled
+	return supply, transfers, locks, unhandled
 
 }
 
-func analyzeSummary(supply, transfers map[string]float64, stablecoins []string) string {
+func analyzeSummary(supply, transfers, locks map[string]float64, stablecoins []string) string {
 	p := message.NewPrinter(language.English)
 	var msg []string
 	// TODO: Separate function to process supply
@@ -322,6 +331,48 @@ func analyzeSummary(supply, transfers map[string]float64, stablecoins []string) 
 		msg = append(msg, "Exchange Outflow:")
 		msg = append(msg, withdraws...)
 	}
+
+	var locked []string
+	var unlocked []string
+	for key, value := range locks {
+		abs := math.Abs(value)
+		if abs < 1000000 {
+			// sum of inflow and outflow might be insignificant. ignore
+			continue
+		}
+		val := p.Sprintf("%.2fM", abs/1000000)
+		if abs >= 1000000000 {
+			val = p.Sprintf("%.2fB", abs/1000000000)
+		}
+		m := p.Sprintf("  `%-5s`: $%s", strings.ToUpper(key), val)
+		if value > 0 {
+			if isStableCoin(key, stablecoins) {
+				// locking of stable coin suggets less buying. bearish
+				m += " (bear)"
+			} else {
+				// locking of crypto means less supply and higher price. bullish
+				m += " (bull)"
+			}
+			locked = append(locked, m)
+		} else {
+			if isStableCoin(key, stablecoins) {
+				//unlocking of stable coin suggests more buying. bullish
+				m += " (bull)"
+			} else {
+				// minting of new crypto means sell pressure. bearish
+				m += " (bear)"
+			}
+			unlocked = append(unlocked, m)
+		}
+	}
+	if len(locked) > 0 {
+		msg = append(msg, "Locked:")
+		msg = append(msg, locked...)
+	}
+	if len(unlocked) > 0 {
+		msg = append(msg, "Unlocked:")
+		msg = append(msg, unlocked...)
+	}
 	return strings.Join(msg, "\n")
 }
 
@@ -378,9 +429,7 @@ func logWhales(ctx context.Context, pgurl string, transactions []Transaction) {
 		INSERT INTO whales
 		(blockchain, address, owner, owner_type)
 		VALUES ($1, $2, NULLIF($3, ''), $4)
-		ON CONFLICT ON CONSTRAINT ux_blockchain_address DO UPDATE SET
-			owner = NULLIF($3, ''),
-			owner_type = $4;
+		ON CONFLICT DO NOTHING;
 	`
 	conn, err := pgx.Connect(ctx, pgurl)
 	if err != nil {
